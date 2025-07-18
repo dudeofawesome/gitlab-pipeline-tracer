@@ -20,10 +20,7 @@ export function fetch_data({ job_id, pipeline_id, project_id }: {
 }) {
   return GitlabService.pipe(
     Effect.andThen((gitlab) =>
-      gitlab.Jobs.all(project_id, {
-        pipelineId: pipeline_id,
-        pagination: 'offset',
-      })
+      gitlab.Jobs.all(project_id, { pipelineId: pipeline_id })
         .pipe(
           Effect.andThen((jobs) =>
             pipe(

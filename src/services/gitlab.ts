@@ -147,14 +147,13 @@ const cache = Effect.fn('cache')(
     {
       fetcher,
       path,
-      // schema = S.String as unknown as S.Schema<Output, string>,
-      schema = S.parseJson(S.Any),
+      schema = S.parseJson(S.Any, { space: 2 }),
     }: {
       path: string
       fetcher: () => Promise<Output>
       schema?: S.Schema<Output, string>
     },
-  ) /*: Effect.Effect<Output, unknown, FileSystem.FileSystem> */ {
+  ) {
     const fs = yield* FileSystem.FileSystem
 
     return yield* pipe(
@@ -163,9 +162,9 @@ const cache = Effect.fn('cache')(
       Effect.andThen(S.decode(schema, { errors: 'all' })),
     ).pipe(
       Effect.catchAll(() =>
-        Effect.tryPromise(fetcher).pipe(Effect.tap((log) =>
+        Effect.tryPromise(fetcher).pipe(Effect.tap((data) =>
           pipe(
-            S.encode(schema, { errors: 'all' })(log),
+            S.encode(schema, { errors: 'all' })(data),
             Effect.tap(fs.makeDirectory(dirname(path), { recursive: true })),
             Effect.andThen((encoded) => fs.writeFileString(path, encoded)),
           )
