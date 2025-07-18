@@ -2,11 +2,13 @@ import type { JobSchema } from '@gitbeaker/rest'
 import { Array, DateTime, Effect, Option, pipe, String } from 'effect'
 import type { Merge } from 'type-fest'
 import { GitlabService } from '../services/gitlab.js'
+import { log_search } from './log-search.js'
 
 export type JobFull = Merge<
   JobSchema,
   {
     _log: string
+    _spans: Array<{ name: string; start: DateTime.Utc; end: DateTime.Utc }>
     runner: Merge<JobSchema['runner'], { version: Option.Option<string> }>
     started_at: Option.Some<DateTime.Utc>
     finished_at: Option.Some<DateTime.Utc>
@@ -52,6 +54,108 @@ export function fetch_data({ job_id, pipeline_id, project_id }: {
                     finished_at: DateTime.make(finished_at ?? NaN),
 
                     _log: log,
+
+                    _spans: pipe(
+                      [
+                        // docker executor setup
+                        log_search({
+                          name: 'docker',
+                          regex:
+                            /^(?<start>.+?Z) .+?Preparing the "docker" executor(?:.|\n)+?^(?<end>.+?Z) .+?Using docker image /um,
+                          log,
+                        }),
+
+                        // cloning
+                        log_search({
+                          name: 'git',
+                          regex:
+                            /^(?<start>.+?Z).*?Getting source from Git repository.*?\n(?:.*\n)*?.*^(?<end>.+?Z).*?(?:Removing|section_end:)/um,
+                          log,
+                        }),
+
+                        // cleaning
+                        log_search({
+                          name: 'rm',
+                          regex:
+                            /^(?<start>.+?Z).*? Removing .*?\n(?:.*\n)*.+Removing.*\n^(?<end>.+?Z)/um,
+                          log,
+                        }),
+
+                        // download artifacts
+                        log_search({
+                          name: 'artifacts',
+                          regex:
+                            /^(?<start>.+?Z).*?section_start:\d+:download_artifacts$(?:.*\n)*?^(?<end>.+?Z).*?section_end:\d+:download_artifacts$/um,
+                          log,
+                        }),
+
+                        // apt-get
+                        log_search({
+                          name: 'apt',
+                          regex:
+                            /^(?<start>.+?Z).*?apt-get[\s\-a-zA-Z]+update(?:.*\n)*.*(?:01E debconf|apt-get).*?\n^(?<end>.+?Z)/um,
+                          log,
+                        }),
+
+                        // npm install
+                        log_search({
+                          name: 'npm',
+                          regex:
+                            /^(?<start>.+?Z) .+?\$ npm ci.+?\n(?:.*npm .*\n)+^(?<end>.+?Z) /um,
+                          log,
+                        }),
+
+                        // serverless build
+                        log_search({
+                          name: 'serverless',
+                          regex:
+                            /^(?<start>.+?Z).*?> sls package.*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*✔ Service packaged/um,
+                          log,
+                        }),
+
+                        // esbuild
+                        log_search({
+                          name: 'esbuild',
+                          regex:
+                            /^(?<start>.+?Z).*?(?:node esbuild.mjs|> esbuild).*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*⚡\s+.*Done in /um,
+                          log,
+                        }),
+
+                        // next build
+                        log_search({
+                          name: 'next_build',
+                          regex:
+                            /^(?<start>.+?Z).*?> next build.*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*prerendered as static content$/um,
+                          log,
+                        }),
+
+                        // upload artifacts
+                        log_search({
+                          name: 'artifacts',
+                          regex:
+                            /^(?<start>.+?Z).*?section_start:\d+:upload_artifacts_on_success.*?\r(?:.*\n)*?.*^(?<end>.+?Z).*?section_end:\d+:upload_artifacts_on_success/um,
+                          log,
+                        }),
+
+                        // cleanup
+                        // log_search({
+                        //   name: 'cleanup',
+                        //   regex:
+                        //     /^(?<start>.+?Z).*?section_start:\d+:cleanup_file_variables.*?\r(?:.*\n)*?.*^(?<end>.+?Z).*?section_end:\d+:cleanup_file_variables/um,
+                        //   log,
+                        // }),
+
+                        // pre-"job succeeded"
+                        log_search({
+                          name: 'wait',
+                          regex:
+                            // eslint-disable-next-line no-control-regex -- matching ESC char
+                            /^(?<start>.+?Z).*?00O\+\[0K$.*?(?:.*\n)*?.*^(?<end>.+?Z).*?Job succeeded/um,
+                          log,
+                        }),
+                      ],
+                      Array.filterMap((span) => span),
+                    ),
                   }
                 })
               ),
