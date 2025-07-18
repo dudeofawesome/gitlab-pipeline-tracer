@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@1password/op-js':
+        specifier: ^0.1.13
+        version: 0.1.13
       '@gitbeaker/rest':
         specifier: ^42.5.0
         version: 42.5.0
@@ -99,6 +102,9 @@ importers:
     publishDirectory: dist
 
 packages:
+
+  '@1password/op-js@0.1.13':
+    resolution: {integrity: sha512-ZZBLxVqywFdvIbLv2xWw2N1ImSi183rRKf90vV19KRMReNyLwuD0dv6IrKrIdrJU33IuV3Gz85Z4K2a1PJTBDg==}
 
   '@alloc/quick-lru@5.2.0':
     resolution: {integrity: sha512-UrcABB+4bUrFABwbluTIBErXwvbsU/V7TZWfmbgJfbkwiBuziS9gxdODUyuiecfdGQ85jglMW6juS3+z5TsKLw==}
@@ -2878,6 +2884,11 @@ packages:
   lodash@4.17.21:
     resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
 
+  lookpath@1.2.3:
+    resolution: {integrity: sha512-kthRVhf4kH4+HW3anM4UBHxsw/XFESf13euCEldhXr6GpBdmBoa7rDd7WO5G0Mhd4G5XtKTcEy8OR0iRZXpS3Q==}
+    engines: {npm: '>=6.13.4'}
+    hasBin: true
+
   loupe@3.1.4:
     resolution: {integrity: sha512-wJzkKwJrheKtknCOKNEtDK4iqg/MxmZheEMtSTYvnzRdEYaZzmgH976nenp8WdJRdx5Vc1X/9MO0Oszl6ezeXg==}
 
@@ -4000,6 +4011,11 @@ packages:
     resolution: {integrity: sha512-XBx9AXhXktjUqnepgTiE5flcKIYWi/rme0Eaj+5Y0lftuGBq+jyRu/md4WnuxqgP1ubdpNCsYEYPxrzVHD8d6g==}
 
 snapshots:
+
+  '@1password/op-js@0.1.13':
+    dependencies:
+      lookpath: 1.2.3
+      semver: 7.7.2
 
   '@alloc/quick-lru@5.2.0': {}
 
@@ -6894,6 +6910,8 @@ snapshots:
   lodash.sortby@4.7.0: {}
 
   lodash@4.17.21: {}
+
+  lookpath@1.2.3: {}
 
   loupe@3.1.4: {}
 

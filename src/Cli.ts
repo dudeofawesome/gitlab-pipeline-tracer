@@ -1,7 +1,5 @@
 import { Args, Command, Options } from '@effect/cli'
-import { Command as ShellCommand, FileSystem } from '@effect/platform'
-import type { JobSchema } from '@gitbeaker/rest'
-import { Gitlab } from '@gitbeaker/rest'
+import { FileSystem } from '@effect/platform'
 import { run as mermaid } from '@mermaid-js/mermaid-cli'
 import { stripIndent } from 'common-tags'
 import {
@@ -17,114 +15,41 @@ import {
   pipe,
   String,
 } from 'effect'
-import type { Merge } from 'type-fest'
-
-type JobFull = Merge<
-  JobSchema,
-  {
-    _log: string
-    runner: Merge<JobSchema['runner'], { version: Option.Option<string> }>
-    started_at: Option.Some<DateTime.Utc>
-    finished_at: Option.Some<DateTime.Utc>
-  }
->
+import type { JobFull } from './lib/fetch-data.js'
+import { fetch_data } from './lib/fetch-data.js'
+import { log_search } from './lib/log-search.js'
+import { GitlabService } from './services/gitlab.js'
 
 const command = Command.make(
-  'hello',
+  'generate',
   {
-    project_id: Args.text({ name: 'project ID' }),
-    pipeline_id: Args.integer({ name: 'pipeline ID' }),
-    job_id: Args.integer({ name: 'job ID' }).pipe(Args.optional),
     sort: Options.choice(
       'sort',
       ['runner', 'name', 'time'] as const,
     ).pipe(Options.withDefault('name' as const)),
-    generate_svg: Options.boolean('svg').pipe(
+    generate_svg: Options.boolean('svg', {
+      // aliases: ['g'],
+      // negationNames: ['no-svg'],
+    }).pipe(
       Options.withDefault(true),
       Options.withDescription(`generate SVG`),
     ),
+
+    project_id: Args.text({ name: 'project ID' }),
+    pipeline_id: Args.integer({ name: 'pipeline ID' }),
+    job_id: Args.integer({ name: 'job ID' }).pipe(Args.optional),
   },
   ({ generate_svg, job_id, pipeline_id, project_id, sort }) =>
     Effect.gen(function*() {
       yield* Console.error(project_id, pipeline_id)
 
-      const gitlab_token = yield* ShellCommand.string(
-        ShellCommand.make(
-          'op',
-          'item',
-          'get',
-          'GitLab Personal Access Token',
-          '--fields',
-          'token',
-          '--reveal',
+      const pipeline = yield* GitlabService.pipe(
+        Effect.andThen((gitlab) =>
+          gitlab.Pipelines.show(project_id, pipeline_id)
         ),
       )
-      const gitlab = yield* Effect.try(() =>
-        new Gitlab({
-          host: 'https://gitlabdev.paciolan.info',
-          token: gitlab_token,
-        })
-      )
 
-      const pipeline = yield* Effect.tryPromise(() =>
-        gitlab.Pipelines.show(project_id, pipeline_id)
-      )
-      const jobs = yield* Effect.tryPromise(() =>
-        gitlab.Jobs.all(project_id, { pipelineId: pipeline_id })
-      ).pipe(
-        Effect.andThen((jobs) =>
-          pipe(
-            jobs,
-            // enrich job data
-            Array.map((job) =>
-              Effect.gen(function*() {
-                const { finished_at, id, started_at } = job
-
-                const log = yield* Effect.tryPromise(() =>
-                  gitlab.Jobs.showLog(project_id, id)
-                )
-
-                return {
-                  ...job,
-
-                  runner: {
-                    ...job.runner,
-                    version: pipe(
-                      log,
-                      String.match(
-                        /^[^\n]*Running with gitlab-runner (?<version>\d+\.\d+\.\d+) \(/u,
-                      ),
-                      Option.andThen((match) =>
-                        Option.fromNullable(match.groups?.version)
-                      ),
-                    ),
-                  },
-
-                  started_at: DateTime.make(started_at ?? NaN),
-                  finished_at: DateTime.make(finished_at ?? NaN),
-
-                  _log: log,
-                }
-              })
-            ),
-            Effect.all,
-            // filter out incomplete jobs
-            Effect.map(
-              Array.filter((job): job is JobFull =>
-                Option.isSome(job.started_at)
-                && Option.isSome(job.finished_at)
-                && job.runner != null
-              ),
-            ),
-            // filter out non-specified jobs
-            Effect.map(
-              Array.filter((job) =>
-                Option.isSome(job_id) ? job.id === job_id.value : true
-              ),
-            ),
-          )
-        ),
-      )
+      const jobs = yield* fetch_data({ project_id, job_id, pipeline_id })
 
       const sorter = Match.value(sort).pipe(
         Match.when('name', () =>
@@ -155,21 +80,27 @@ const command = Command.make(
         stripIndent`
           ---
           theme: default
-          displayMode: compact
+          # displayMode: compact
           config:
             securityLevel: "loose"
             themeCSS: "
               #docker { fill: #1D63EC; stroke: #01298A; }
-              #docker-text { fill: white; stroke: black; }
+              #docker-text { fill: white; stroke: gray; }
 
               #git { fill: #F25037; stroke: #2F2708; }
-              #git-text { fill: white; }
+              #git-text { fill: white; stroke: gray; }
 
               #npm { fill: #A01021; stroke: #872322; }
               #npm-text { fill: white; }
 
+              #esbuild { fill: #FFCF02; stroke: #191919; }
+              #esbuild-text { fill: black; stroke: gray; }
+
+              #serverless { fill: #FD5850; stroke: #9B0902; }
+              #serverless-text { fill: white; stroke: gray; }
+
               #next_build { fill: #000; stroke: #333; }
-              #next_build-text { fill: white; stroke: black; }
+              #next_build-text { fill: white; stroke: gray; }
             "
             gantt:
               topAxis: true
@@ -249,6 +180,14 @@ const command = Command.make(
                 log: job._log,
               }),
 
+              // download artifacts
+              log_search({
+                name: 'artifacts',
+                regex:
+                  /^(?<start>.+?Z).*?section_start:\d+:download_artifacts$(?:.*\n)*?^(?<end>.+?Z).*?section_end:\d+:download_artifacts$/um,
+                log: job._log,
+              }),
+
               // npm install
               log_search({
                 name: 'npm',
@@ -257,11 +196,27 @@ const command = Command.make(
                 log: job._log,
               }),
 
+              // serverless build
+              log_search({
+                name: 'serverless',
+                regex:
+                  /^(?<start>.+?Z).*?> sls package.*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*✔ Service packaged/um,
+                log: job._log,
+              }),
+
+              // esbuild
+              log_search({
+                name: 'esbuild',
+                regex:
+                  /^(?<start>.+?Z).*?(?:node esbuild.mjs|> esbuild).*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*⚡\s+.*Done in /um,
+                log: job._log,
+              }),
+
               // next build
               log_search({
                 name: 'next_build',
                 regex:
-                  /^(?<start>.+?Z).*?> next build.*?\n(?:.*\n)*?.*prerendered as static content.*\r^(?<end>.+?Z)/um,
+                  /^(?<start>.+?Z).*?> next build.*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*prerendered as static content$/um,
                 log: job._log,
               }),
 
@@ -291,6 +246,10 @@ const command = Command.make(
               mermaidConfig: {
                 'securityLevel': 'loose',
               },
+              viewport: {
+                width: 3000,
+                height: 1000,
+              },
             },
           })
         ).pipe(
@@ -301,53 +260,6 @@ const command = Command.make(
       yield* Console.error('done')
     }),
 )
-
-function log_search(
-  { log, name, regex, tag = name }: {
-    name: string
-    tag?: string
-    regex: RegExp
-    log: string
-  },
-) {
-  return pipe(
-    log,
-    String.match(
-      regex,
-    ),
-    // (str) => Option.fromNullable(str.match(regex)),
-    Option.andThen(({ groups }) =>
-      Option.all({
-        start: DateTime.make(groups?.start ?? ''),
-        end: DateTime.make(groups?.end ?? ''),
-      })
-    ),
-    Option.map(({ end, start }) => {
-      const dur = DateTime.distanceDuration(start, end)
-      // build task
-      return [
-        [
-          name,
-          dur.pipe(Duration.greaterThan(Duration.seconds(30)))
-            ? `(${dur.pipe(Duration.toMinutes, (n) => n.toFixed(1))}m)`
-            : '',
-          `:${tag}`,
-        ]
-          .join(' '),
-        start.pipe(DateTime.toEpochMillis),
-        end.pipe(DateTime.toEpochMillis),
-      ].join(', ')
-    }),
-    // Option.orElse(() => Option.some('')),
-    (opt) => {
-      if (Option.isNone(opt)) {
-        console.log(name, log)
-      }
-      return opt
-    },
-    (opt) => Option.isSome(opt) ? opt.value : '',
-  )
-}
 
 export const run = Command.run(command, {
   name: 'Hello World',

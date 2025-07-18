@@ -16,3 +16,4 @@ dist/
 *.mmd
 *.svg
 mermaid-config.json
+.cache/
