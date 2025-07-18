@@ -8,7 +8,12 @@ export type JobFull = Merge<
   JobSchema,
   {
     _log: string
-    _spans: Array<{ name: string; start: DateTime.Utc; end: DateTime.Utc }>
+    _spans: Array<{
+      name: string
+      start: DateTime.Utc
+      end: DateTime.Utc
+      logs: string
+    }>
     runner: Merge<JobSchema['runner'], { version: Option.Option<string> }>
     started_at: Option.Some<DateTime.Utc>
     finished_at: Option.Some<DateTime.Utc>

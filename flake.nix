@@ -22,6 +22,7 @@
             python3
             pnpm
             # mermaid-cli
+            otel-desktop-viewer
           ];
         };
       });

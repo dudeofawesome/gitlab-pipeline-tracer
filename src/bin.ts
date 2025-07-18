@@ -2,10 +2,12 @@
 
 import * as NodeContext from '@effect/platform-node/NodeContext'
 import * as NodeRuntime from '@effect/platform-node/NodeRuntime'
+import { ConfigProvider } from 'effect'
 import * as Effect from 'effect/Effect'
 import { run } from './Cli.js'
 import { OnePasswordServiceLive } from './services/1password.js'
 import { GitlabServiceLive } from './services/gitlab.js'
+import 'dotenv/config'
 
 run(process.argv).pipe(
   Effect.provide(GitlabServiceLive),
@@ -13,5 +15,6 @@ run(process.argv).pipe(
     OnePasswordServiceLive,
     NodeContext.layer,
   ]),
+  Effect.withConfigProvider(ConfigProvider.fromEnv()),
   NodeRuntime.runMain({ disableErrorReporting: false }),
 )

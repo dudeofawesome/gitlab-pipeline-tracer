@@ -6,11 +6,12 @@ export function log_search(
   return pipe(
     log,
     String.match(regex),
-    Option.andThen(({ groups }) =>
+    Option.andThen((match) =>
       Option.all({
         name: Option.some(name),
-        start: DateTime.make(groups?.start ?? ''),
-        end: DateTime.make(groups?.end ?? ''),
+        start: DateTime.make(match.groups?.start ?? ''),
+        end: DateTime.make(match.groups?.end ?? ''),
+        logs: Option.fromNullable(match.groups?.logs ?? match[0]),
       })
     ),
   )

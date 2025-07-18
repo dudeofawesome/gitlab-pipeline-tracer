@@ -4,11 +4,20 @@ import { Console, Effect, Match } from 'effect'
 import { join } from 'path'
 import { fetch_data } from './lib/fetch-data.js'
 import { gantt } from './lib/gantt.js'
+import { otel } from './lib/otel.js'
 import { GitlabService } from './services/gitlab.js'
 
 const parse = Command.make(
   'parse',
   {
+    output: Options.choice(
+      'output',
+      ['gantt', 'otel'] as const,
+    ).pipe(Options.withDefault('gantt' as const)),
+    trace_dest: Options.choice(
+      'trace-dest',
+      ['local', 'swo'] as const,
+    ).pipe(Options.withDefault('local' as const)),
     sort: Options.choice(
       'sort',
       ['runner', 'name', 'time'] as const,
@@ -28,7 +37,18 @@ const parse = Command.make(
     pipeline_id: Args.integer({ name: 'pipeline ID' }),
     job_id: Args.integer({ name: 'job ID' }).pipe(Args.optional),
   },
-  ({ generate_svg, job_id, no_cache, output, pipeline_id, project_id, sort }) =>
+  (
+    {
+      generate_svg,
+      job_id,
+      no_cache,
+      output,
+      pipeline_id,
+      project_id,
+      sort,
+      trace_dest,
+    },
+  ) =>
     Effect.gen(function*() {
       yield* Console.error(project_id, pipeline_id)
 
@@ -54,6 +74,9 @@ const parse = Command.make(
           'gantt',
           () => gantt({ generate_svg, jobs, pipeline, pipeline_id, sort }),
         ),
+        Match.when(
+          'otel',
+          () => otel({ jobs, pipeline, trace_dest }),
         ),
         Match.exhaustive,
       )

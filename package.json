@@ -59,6 +59,12 @@
     "@1password/op-js": "^0.1.13",
     "@gitbeaker/rest": "^42.5.0",
     "@mermaid-js/mermaid-cli": "^11.6.0",
-    "common-tags": "^1.8.2"
+    "@opentelemetry/api": "^1.9.0",
+    "@opentelemetry/exporter-trace-otlp-http": "^0.203.0",
+    "@opentelemetry/resources": "^2.0.1",
+    "@opentelemetry/sdk-trace-node": "^2.0.1",
+    "@opentelemetry/semantic-conventions": "^1.36.0",
+    "common-tags": "^1.8.2",
+    "dotenv": "^17.2.0"
   }
 }
