@@ -27,7 +27,7 @@
   "devDependencies": {
     "@effect/cli": "latest",
     "@effect/eslint-plugin": "^0.2.0",
-    "@effect/language-service": "^0.1.0",
+    "@effect/language-service": "^0.27.2",
     "@effect/platform": "latest",
     "@effect/platform-node": "latest",
     "@effect/vitest": "latest",

@@ -36,7 +36,12 @@
     "module": "NodeNext",
     "incremental": true,
     "removeComments": false,
-    "plugins": [{ "name": "@effect/language-service" }],
+    "plugins": [
+      {
+        "name": "@effect/language-service",
+        "transform": "@effect/language-service/transform" // enables diagnostics at compile time when using ts-patch
+      }
+    ],
     "paths": {
       "@template/cli": ["./src/index.js"],
       "@template/cli/*": ["./src/*.js"]
