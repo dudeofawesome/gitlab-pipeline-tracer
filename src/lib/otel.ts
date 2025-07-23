@@ -17,7 +17,10 @@ import {
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node'
-import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
+import {
+  ATTR_SERVICE_NAMESPACE,
+  ATTR_URL_TEMPLATE,
+} from '@opentelemetry/semantic-conventions/incubating'
 import {
   Array,
   Config,
@@ -61,6 +64,7 @@ export const otel = Effect.fn('otel')(
     )
 
     const resource = resourceFromAttributes({
+      [ATTR_SERVICE_NAMESPACE]: 'gitlab',
       [ATTR_SERVICE_NAME]: 'gitlab pipelines',
     })
     const provider = new NodeTracerProvider({
@@ -147,6 +151,7 @@ export const otel = Effect.fn('otel')(
                 attributes: {
                   'step.name': task.name,
                   'step.logs': task.logs,
+                  'step.fixed_start': task.fixed_start,
                 },
               },
               job_ctx,
@@ -166,9 +171,11 @@ export const otel = Effect.fn('otel')(
     yield* Console.error(
       `Sending trace ${pipeline_span.spanContext().traceId} to ${trace_dest}`,
     )
+    if (trace_dest === 'local') {
     yield* Console.error(
       `http://localhost:16686/trace/${pipeline_span.spanContext().traceId}`,
     )
+    }
 
     yield* Effect.tryPromise(() => provider.shutdown())
 

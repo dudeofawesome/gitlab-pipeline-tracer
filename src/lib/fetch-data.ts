@@ -6,18 +6,14 @@ import type { UnknownException } from 'effect/Cause'
 import type { ParseError } from 'effect/ParseResult'
 import type { Merge } from 'type-fest'
 import { GitlabService } from '../services/gitlab.js'
+import type { Task } from './log-search.js'
 import { log_search } from './log-search.js'
 
 export type JobFull = Merge<
   JobSchema,
   {
     _log: string
-    _spans: Array<{
-      name: string
-      start: DateTime.Utc
-      end: DateTime.Utc
-      logs: string
-    }>
+    _spans: Array<Task>
     runner: Merge<JobSchema['runner'], { version: Option.Option<string> }>
     started_at: Option.Some<DateTime.Utc>
     finished_at: Option.Some<DateTime.Utc>
@@ -74,6 +70,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z) .+?Preparing the "docker" executor(?:.|\n)+?^(?<end>.+?Z) .+?Using docker image /um,
                   log,
+                  job,
                 }),
 
                 // cloning
@@ -82,14 +79,16 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z).*?Getting source from Git repository.*?\n(?:.*\n)*?.*^(?<end>.+?Z).*?(?:Removing|section_end:)/um,
                   log,
+                  job,
                 }),
 
                 // cleaning
                 log_search({
                   name: 'rm',
                   regex:
-                    /^(?<start>.+?Z).*? Removing .*?\n(?:.*\n)*.+Removing.*\n^(?<end>.+?Z)/um,
+                    /(?<log>^(?<start>.+?Z).*? Removing .*?\n(?:.*\n)*.+Removing.*)\n^(?<end>.+?Z)/um,
                   log,
+                  job,
                 }),
 
                 // download artifacts
@@ -98,6 +97,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z).*?section_start:\d+:download_artifacts$(?:.*\n)*?^(?<end>.+?Z).*?section_end:\d+:download_artifacts$/um,
                   log,
+                  job,
                 }),
 
                 // apt-get
@@ -106,6 +106,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z).*?apt-get[\s\-a-zA-Z]+update(?:.*\n)*.*(?:01E debconf|apt-get).*?\n^(?<end>.+?Z)/um,
                   log,
+                  job,
                 }),
 
                 // npm install
@@ -114,6 +115,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z) .+?\$ npm ci.+?\n(?:.*npm .*\n)+^(?<end>.+?Z) /um,
                   log,
+                  job,
                 }),
 
                 // serverless build
@@ -122,6 +124,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z).*?> sls package.*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*✔ Service packaged/um,
                   log,
+                  job,
                 }),
 
                 // esbuild
@@ -130,6 +133,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z).*?(?:node esbuild.mjs|> esbuild).*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*⚡\s+.*Done in /um,
                   log,
+                  job,
                 }),
 
                 // next build
@@ -138,6 +142,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z).*?> next build.*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*prerendered as static content$/um,
                   log,
+                  job,
                 }),
 
                 // eslint
@@ -154,6 +159,7 @@ export const fetch_data: (opts: {
                   regex:
                     /^(?<start>.+?Z).*?section_start:\d+:upload_artifacts_on_success.*?\r(?:.*\n)*?.*^(?<end>.+?Z).*?section_end:\d+:upload_artifacts_on_success/um,
                   log,
+                  job,
                 }),
 
                 // cleanup
@@ -171,6 +177,7 @@ export const fetch_data: (opts: {
                     // eslint-disable-next-line no-control-regex -- matching ESC char
                     /^(?<start>.+?Z).*?00O\+\[0K$.*?(?:.*\n)*?.*^(?<end>.+?Z).*?Job succeeded/um,
                   log,
+                  job,
                 }),
               ],
               Array.filterMap((span) => span),
