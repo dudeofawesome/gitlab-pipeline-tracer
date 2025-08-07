@@ -1,3 +1,4 @@
+import { Url } from '@effect/platform'
 import type { PipelineSchema } from '@gitbeaker/rest'
 import {
   context,
@@ -18,6 +19,20 @@ import {
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node'
 import {
+  ATTR_SERVICE_NAME,
+} from '@opentelemetry/semantic-conventions'
+import {
+  ATTR_CICD_PIPELINE_NAME,
+  ATTR_CICD_PIPELINE_RESULT,
+  ATTR_CICD_PIPELINE_RUN_ID,
+  ATTR_CICD_PIPELINE_RUN_URL_FULL,
+  ATTR_CICD_PIPELINE_TASK_NAME,
+  ATTR_CICD_PIPELINE_TASK_RUN_ID,
+  ATTR_CICD_PIPELINE_TASK_RUN_RESULT,
+  ATTR_CICD_PIPELINE_TASK_RUN_URL_FULL,
+  ATTR_CICD_WORKER_ID,
+  ATTR_CICD_WORKER_NAME,
+  ATTR_CICD_WORKER_URL_FULL,
   ATTR_SERVICE_NAMESPACE,
   ATTR_URL_TEMPLATE,
 } from '@opentelemetry/semantic-conventions/incubating'
@@ -27,11 +42,23 @@ import {
   Console,
   DateTime,
   Effect,
+  Either,
   Match,
   Option,
   pipe,
   Redacted,
 } from 'effect'
+import {
+  ATTR_CICD_PIPELINE_TASK_STARTED_BY_ID,
+  ATTR_CICD_PIPELINE_TASK_STARTED_BY_NAME,
+  ATTR_CICD_PIPELINE_TASK_STEP_ADJUSTED_START_TS,
+  ATTR_CICD_PIPELINE_TASK_STEP_LOGS,
+  ATTR_CICD_PIPELINE_TASK_STEP_NAME,
+  ATTR_CICD_WORKER_IP_ADDRESS,
+  ATTR_CICD_WORKER_TYPE,
+  ATTR_CICD_WORKER_VERSION,
+  ATTR_GITLAB_PROJECT_ID,
+} from './attributes.js'
 import type { JobFull } from './fetch-data.js'
 
 export const otel = Effect.fn('otel')(
@@ -90,14 +117,17 @@ export const otel = Effect.fn('otel')(
     const pipeline_start = DateTime.unsafeMake(pipeline.created_at).pipe(
       DateTime.toEpochMillis,
     )
-    const pipeline_span = tracer.startSpan(`pipeline #${pipeline.id}`, {
+    const pipeline_name = `pipeline #${pipeline.id}`
+    const pipeline_span = tracer.startSpan(pipeline_name, {
       kind: SpanKind.SERVER,
       root: true,
       startTime: pipeline_start,
       attributes: {
-        'project.id': pipeline.project_id,
-        'pipeline.id': pipeline.id,
-        'pipeline.url': pipeline.web_url,
+        [ATTR_GITLAB_PROJECT_ID]: pipeline.project_id,
+        [ATTR_CICD_PIPELINE_NAME]: pipeline.ref,
+        [ATTR_CICD_PIPELINE_RUN_ID]: pipeline.id,
+        [ATTR_CICD_PIPELINE_RUN_URL_FULL]: pipeline.web_url,
+        [ATTR_CICD_PIPELINE_RESULT]: pipeline.status,
       },
     })
     // pipeline_span.spanContext().traceId = `${pipeline.id}`
@@ -116,15 +146,40 @@ export const otel = Effect.fn('otel')(
           {
             startTime: job.started_at.value.pipe(DateTime.toEpochMillis),
             attributes: {
-              'job.id': job.id,
-              'job.name': job.name,
-              'job.url': job.web_url,
-              'job.queued_duration': job.queued_duration,
-              'runner.id': job.runner.id,
-              'runner.name': job.runner.name,
-              'runner.version': Option.isSome(job.runner.version)
+              [ATTR_CICD_PIPELINE_TASK_RUN_ID]: job.id,
+              [ATTR_CICD_PIPELINE_TASK_NAME]: job.name,
+              [ATTR_CICD_PIPELINE_TASK_RUN_URL_FULL]: job.web_url,
+              [ATTR_CICD_PIPELINE_TASK_STARTED_BY_ID]: job.user.id,
+              [ATTR_CICD_PIPELINE_TASK_STARTED_BY_NAME]: job.user.name,
+              [ATTR_CICD_PIPELINE_TASK_RUN_RESULT]: job.status,
+              'job.queued_duration_s': job.queued_duration,
+              [ATTR_CICD_WORKER_ID]: job.runner.id,
+              [ATTR_CICD_WORKER_NAME]: job.runner.name,
+              [ATTR_CICD_WORKER_VERSION]: Option.isSome(job.runner.version)
                 ? job.runner.version.value
                 : undefined,
+              [ATTR_CICD_WORKER_URL_FULL]: pipe(
+                job.pipeline.web_url,
+                Url.fromString,
+                Either.map((url) =>
+                  Url.setPathname(url, `groups/${url.pathname}`)
+                ),
+                Either.map((url) =>
+                  Url.setPathname(
+                    url,
+                    url.pathname.replace(/\/[^/]+\/-\/pipelines\/\d+$/, ''),
+                  )
+                ),
+                Either.map((url) =>
+                  Url.setPathname(
+                    url,
+                    `${url.pathname}/-/runners/${job.runner.id}`,
+                  )
+                ),
+                (res) => Either.isRight(res) ? res.right.toString() : undefined,
+              ),
+              [ATTR_CICD_WORKER_TYPE]: job.runner.runner_type,
+              [ATTR_CICD_WORKER_IP_ADDRESS]: job.runner.ip_address,
             },
           },
           pipeline_ctx,
@@ -149,9 +204,10 @@ export const otel = Effect.fn('otel')(
                 kind: SpanKind.CLIENT,
                 startTime: task.start.pipe(DateTime.toEpochMillis),
                 attributes: {
-                  'step.name': task.name,
-                  'step.logs': task.logs,
-                  'step.fixed_start': task.fixed_start,
+                  [ATTR_CICD_PIPELINE_TASK_STEP_NAME]: task.name,
+                  [ATTR_CICD_PIPELINE_TASK_STEP_LOGS]: task.logs,
+                  [ATTR_CICD_PIPELINE_TASK_STEP_ADJUSTED_START_TS]:
+                    task.fixed_start,
                 },
               },
               job_ctx,
@@ -172,9 +228,9 @@ export const otel = Effect.fn('otel')(
       `Sending trace ${pipeline_span.spanContext().traceId} to ${trace_dest}`,
     )
     if (trace_dest === 'local') {
-    yield* Console.error(
-      `http://localhost:16686/trace/${pipeline_span.spanContext().traceId}`,
-    )
+      yield* Console.error(
+        `http://localhost:16686/trace/${pipeline_span.spanContext().traceId}`,
+      )
     }
 
     yield* Effect.tryPromise(() => provider.shutdown())
