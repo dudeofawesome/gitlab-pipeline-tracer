@@ -1,15 +1,35 @@
-# Effect CLI Application Template
 
-This template provides a solid foundation for building scalable and maintainable command-line applications with Effect. 
+# gitlab-pipeline-visualizer
 
-## Running Code
+Visualizes Gitlab pipelines using OpenTelemetry or Gantt charts.
 
-This template leverages [tsx](https://tsx.is) to allow execution of TypeScript files via NodeJS as if they were written in plain JavaScript.
+## Usage
 
-To execute a file with `tsx`:
+> [!IMPORTANT]
+> Make sure you have `FF_TIMESTAMPS: true` in your pipeline variables
+
+Enter into the dev shell
 
 ```sh
-pnpm tsx ./path/to/the/file.ts
+nix develop
+```
+
+Start a trace collector
+
+```
+podman run --name jaeger --rm \
+    -e COLLECTOR_OTLP_ENABLED=true \
+    -p 16686:16686 \
+    -p 4317:4317 \
+    -p 4318:4318 \
+    docker.io/jaegertracing/all-in-one:1.71.0
+```
+
+Run the CLI
+
+```sh
+pnpm tsx src/bin/ts --help
+pnpm tsx src/bin.ts --output=otel 2772 844427
 ```
 
 ## Operations
