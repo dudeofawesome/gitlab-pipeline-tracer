@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "effect-docs": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "effect-mcp@latest"],
+      "alwaysAllow": ["effect_doc_search", "get_effect_doc"]
+    },
+    "context7": {
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp"],
+      "env": {
+        "DEFAULT_MINIMUM_TOKENS": ""
+      },
+      "alwaysAllow": ["resolve-library-id", "get-library-docs"]
+    }
+  }
+}
