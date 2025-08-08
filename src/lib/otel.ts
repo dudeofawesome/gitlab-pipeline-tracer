@@ -18,9 +18,7 @@ import {
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node'
-import {
-  ATTR_SERVICE_NAME,
-} from '@opentelemetry/semantic-conventions'
+import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
 import {
   ATTR_CICD_PIPELINE_NAME,
   ATTR_CICD_PIPELINE_RESULT,
@@ -130,7 +128,7 @@ export const otel = Effect.fn('otel')(
         [ATTR_CICD_PIPELINE_RESULT]: pipeline.status,
       },
     })
-    // pipeline_span.spanContext().traceId = `${pipeline.id}`
+    pipeline_span.spanContext().traceId = `${pipeline.id}`
     if (pipeline.status !== 'success') {
       pipeline_span.setStatus({ code: SpanStatusCode.ERROR })
     }
