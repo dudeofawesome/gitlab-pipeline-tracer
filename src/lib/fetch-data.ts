@@ -113,7 +113,7 @@ export const fetch_data: (opts: {
                 log_search({
                   name: 'npm',
                   regex:
-                    /^(?<start>.+?Z) .+?\$ npm ci.+?\n(?:.*npm .*\n)+^(?<end>.+?Z) /um,
+                    /^(?<start>.+?Z) .+?\$ npm (?:ci|clean-install|install-clean)\b.+?\n(?:(?<final_npm>(?:.|\n)*^(?<end>.+?Z) npm (?!run))|(?<no_npm>^(?<end>.+?Z) ))/um,
                   log,
                   job,
                 }),
