@@ -18,9 +18,7 @@ import {
   NodeTracerProvider,
   SimpleSpanProcessor,
 } from '@opentelemetry/sdk-trace-node'
-import {
-  ATTR_SERVICE_NAME,
-} from '@opentelemetry/semantic-conventions'
+import { ATTR_SERVICE_NAME } from '@opentelemetry/semantic-conventions'
 import {
   ATTR_CICD_PIPELINE_NAME,
   ATTR_CICD_PIPELINE_RESULT,
@@ -130,7 +128,9 @@ export const otel = Effect.fn('otel')(
         [ATTR_CICD_PIPELINE_RESULT]: pipeline.status,
       },
     })
-    // pipeline_span.spanContext().traceId = `${pipeline.id}`
+    // OTel trace IDs must be 32-character hexadecimal strings.
+    pipeline_span.spanContext().traceId = pipeline.id.toString().padEnd(32, '0')
+
     if (pipeline.status !== 'success') {
       pipeline_span.setStatus({ code: SpanStatusCode.ERROR })
     }
@@ -184,7 +184,7 @@ export const otel = Effect.fn('otel')(
           },
           pipeline_ctx,
         )
-        // job_span.spanContext().traceId = `${job.id}`
+        job_span.spanContext().spanId = job.id.toString().padEnd(16, '0')
         if (job.status !== 'success') {
           job_span.setStatus({
             code: SpanStatusCode.ERROR,
