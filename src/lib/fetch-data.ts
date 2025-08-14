@@ -146,12 +146,13 @@ export const fetch_data: (opts: {
                 }),
 
                 // eslint
-                // log_search({
-                //   name: 'eslint',
-                //   regex:
-                //     /^(?<start>.+?Z).*?> next build.*?\n(?:.*[\n\r])*?^(?<end>.+?Z).*prerendered as static content$/um,
-                //   log,
-                // }),
+                log_search({
+                  name: 'eslint',
+                  regex:
+                    /^(?<start>.+?Z) .*?.*\beslint\b.*?\n(?:.*\n)*^(?<end>.+?Z) .*\b(?:problems \(\d|.*\bNo problems found\b)/um,
+                  log,
+                  job,
+                }),
 
                 // upload artifacts
                 log_search({
