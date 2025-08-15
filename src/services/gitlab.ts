@@ -1,6 +1,6 @@
 import { FileSystem } from '@effect/platform'
 import type { PlatformError } from '@effect/platform/Error'
-import type { JobSchema, PipelineSchema } from '@gitbeaker/rest'
+import type { JobSchema, PipelineSchema, ProjectSchema } from '@gitbeaker/rest'
 import { Gitlab } from '@gitbeaker/rest'
 import { Context, Effect, Layer, Match, pipe, Schema as S } from 'effect'
 import type { UnknownException } from 'effect/Cause'
@@ -14,6 +14,15 @@ type gitlab = Simplify<(typeof Gitlab)['prototype']>
 export class GitlabService extends Context.Tag('GitlabService')<
   GitlabService,
   {
+    Projects: {
+      show: (
+        project_id_or_path: string | number,
+      ) => Effect.Effect<
+        ProjectSchema,
+        UnknownException | PlatformError | ParseError,
+        FileSystem.FileSystem
+      >
+    }
     Pipelines: {
       show: (
         // ...args: Parameters<gitlab['Pipelines']['show']>
@@ -91,6 +100,19 @@ export const GitlabServiceLive = Layer.effect(
     const gitlab = yield* Effect.try(() => new Gitlab({ host, token }))
 
     return {
+      Projects: {
+        show(projectIdOrPath) {
+          return cache({
+            fetcher: () => gitlab.Projects.show(projectIdOrPath),
+            path: join(
+              '.cache',
+              'gitlab',
+              'projects',
+              `${projectIdOrPath.toString().replaceAll('/', '+')}.json`,
+            ),
+          })
+        },
+      },
       Pipelines: {
         show(projectId, pipelineId) {
           return cache({

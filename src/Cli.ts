@@ -33,7 +33,9 @@ const parse = Command.make(
       Options.withDefault(false),
     ),
 
-    project_id: Args.text({ name: 'project ID' }),
+    project_id_or_path: Args.text({ name: 'project ID / path' }).pipe(
+      Args.withDescription(`The project's ID or path`),
+    ),
     pipeline_id: Args.integer({ name: 'pipeline ID' }),
     job_id: Args.integer({ name: 'job ID' }).pipe(Args.optional),
   },
@@ -44,13 +46,21 @@ const parse = Command.make(
       no_cache,
       output,
       pipeline_id,
-      project_id,
+      project_id_or_path,
       sort,
       trace_dest,
     },
   ) =>
     Effect.gen(function*() {
-      yield* Console.error(project_id, pipeline_id)
+      const gitlab = yield* GitlabService
+
+      const project_id = (project_id_or_path.match(/^\d+$/u)) ?
+        project_id_or_path :
+        yield* gitlab.Projects.show(project_id_or_path).pipe(
+          Effect.map((project) => project.id.toString()),
+        )
+
+      yield* Console.error({ project_id, pipeline_id })
 
       if (no_cache) {
         yield* FileSystem.FileSystem.pipe(
@@ -61,11 +71,7 @@ const parse = Command.make(
         )
       }
 
-      const pipeline = yield* GitlabService.pipe(
-        Effect.andThen((gitlab) =>
-          gitlab.Pipelines.show(project_id, pipeline_id)
-        ),
-      )
+      const pipeline = yield* gitlab.Pipelines.show(project_id, pipeline_id)
 
       const jobs = yield* fetch_data({ project_id, job_id, pipeline_id })
 
