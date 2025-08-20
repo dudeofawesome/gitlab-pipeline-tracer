@@ -34,6 +34,7 @@ import {
   ATTR_SERVICE_NAMESPACE,
   ATTR_URL_TEMPLATE,
 } from '@opentelemetry/semantic-conventions/incubating'
+import type { ConfigError } from 'effect'
 import {
   Array,
   Config,
@@ -227,11 +228,25 @@ export const otel = Effect.fn('otel')(
     yield* Console.error(
       `Sending trace ${pipeline_span.spanContext().traceId} to ${trace_dest}`,
     )
-    if (trace_dest === 'local') {
-      yield* Console.error(
-        `http://localhost:16686/trace/${pipeline_span.spanContext().traceId}`,
-      )
-    }
+    yield* Match.value(trace_dest).pipe(
+      Match.withReturnType<Effect.Effect<void, ConfigError.ConfigError>>(),
+      Match.when('local', () =>
+        Console.error(
+          `http://localhost:16686/trace/${pipeline_span.spanContext().traceId}`,
+        )),
+      Match.when(
+        'swo',
+        () =>
+          Effect.gen(function*() {
+            return yield* Console.error(
+              `https://my.na-01.cloud.solarwinds.com/${yield* Config.string(
+                'SWO_ACCOUNT_ID',
+              )}/traces/${pipeline_span.spanContext().traceId}/details/breakdown`,
+            )
+          }),
+      ),
+      Match.orElse(() => Effect.void),
+    )
 
     yield* Effect.tryPromise(() => provider.shutdown())
 
