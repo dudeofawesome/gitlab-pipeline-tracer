@@ -184,13 +184,16 @@ const cache = Effect.fn('cache')(
       Effect.andThen(S.decode(schema, { errors: 'all' })),
     ).pipe(
       Effect.catchAll(() =>
-        Effect.tryPromise(fetcher).pipe(Effect.tap((data) =>
-          pipe(
-            S.encode(schema, { errors: 'all' })(data),
-            Effect.tap(fs.makeDirectory(dirname(path), { recursive: true })),
-            Effect.andThen((encoded) => fs.writeFileString(path, encoded)),
-          )
-        ))
+        Effect.tryPromise(fetcher).pipe(
+          Effect.retry({ times: 2 }),
+          Effect.tap((data) =>
+            pipe(
+              S.encode(schema, { errors: 'all' })(data),
+              Effect.tap(fs.makeDirectory(dirname(path), { recursive: true })),
+              Effect.andThen((encoded) => fs.writeFileString(path, encoded)),
+            )
+          ),
+        )
       ),
     )
   },

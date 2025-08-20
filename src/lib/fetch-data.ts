@@ -33,7 +33,10 @@ export const fetch_data: (opts: {
     const gitlab = yield* GitlabService
 
     return yield* pipe(
-      gitlab.Jobs.all(project_id, { pipelineId: pipeline_id }),
+      gitlab.Jobs.all(project_id, {
+        pipelineId: pipeline_id,
+        includeRetried: true,
+      }),
       // enrich job data
       Effect.andThen(Array.map((job) =>
         Effect.gen(function*() {
