@@ -185,7 +185,16 @@ const cache = Effect.fn('cache')(
     ).pipe(
       Effect.catchAll(() =>
         Effect.tryPromise(fetcher).pipe(
-          Effect.retry({ times: 2 }),
+          Effect.retry({
+            times: 2,
+            while: Match.type<UnknownException>().pipe(
+              // our Gitlab server is flaky
+              Match.when({
+                cause: { cause: { code: 'EHOSTUNREACH' } },
+              }, () => true),
+              Match.orElse(() => false),
+            ),
+          }),
           Effect.tap((data) =>
             pipe(
               S.encode(schema, { errors: 'all' })(data),
