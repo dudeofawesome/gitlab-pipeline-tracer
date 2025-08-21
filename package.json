@@ -1,5 +1,5 @@
 {
-  "name": "@template/cli",
+  "name": "gitlab-pipeline-tracer",
   "version": "0.0.0",
   "type": "module",
   "packageManager": "pnpm@9.10.0",
@@ -7,7 +7,7 @@
   "description": "A basic Effect CLI application",
   "repository": {
     "type": "git",
-    "url": "<PLACEHOLDER>"
+    "url": "https://github.com/dudeofawesome/gitlab-pipeline-tracer"
   },
   "engines": {
     "node": "^24"
@@ -16,6 +16,7 @@
     "access": "public",
     "directory": "dist"
   },
+  "bin": "src/bin.ts",
   "scripts": {
     "build": "tsup && pnpm copy-package-json",
     "build:ts": "tsup",
